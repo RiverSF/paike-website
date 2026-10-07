@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 208 48" fill="none">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3B7BFF"/><stop offset="1" stop-color="#2D6BFF"/></linearGradient>
+    <filter id="s" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="2" stdDeviation="2.4" flood-color="#2D6BFF" flood-opacity="0.28"/></filter>
+  </defs>
+  <g transform="translate(4,6)" filter="url(#s)">
+    <rect x="0" y="0" width="36" height="36" rx="11" fill="url(#g)"/>
+    <text x="18" y="25" text-anchor="middle" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="21" font-weight="700" fill="#fff">课</text>
+    <circle cx="31" cy="31" r="7" fill="#FFB020"/>
+    <circle cx="31" cy="31" r="2.8" fill="#fff"/>
+  </g>
+  <text x="52" y="33" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="26" font-weight="700" fill="url(#g)">课满满</text>
+</svg>

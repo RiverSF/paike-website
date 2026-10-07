@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.DS_Store
+
+# Go
+server/logs/
+server/data/
+server/tmp/
+server/bin/
+*.log
+
+# 本地配置（含密码等敏感信息，可按需提交）
+server/internal/conf/app.ini
+.env

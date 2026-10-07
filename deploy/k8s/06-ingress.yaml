@@ -1,0 +1,44 @@
+# 需要集群内已安装 ingress-nginx（或其他 ingress controller）
+# 无 ingress 环境可用：kubectl -n tutoring port-forward svc/web 8080:80 临时访问
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: tutoring-ingress
+  namespace: tutoring
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  # TLS：证书来自名为 tutoring-tls 的 Secret。生产请改用真实域名并签发证书
+  # （如 cert-manager 自动签发；或 kubectl create secret tls tutoring-tls --cert=xxx.crt --key=xxx.key）。
+  tls:
+    - hosts:
+        - tutoring.local
+      secretName: tutoring-tls
+  rules:
+    - host: tutoring.local
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: server
+                port:
+                  number: 9090
+          - path: /uploads
+            pathType: Prefix
+            backend:
+              service:
+                name: server
+                port:
+                  number: 9090
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  number: 80

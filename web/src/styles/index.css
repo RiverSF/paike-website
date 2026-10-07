@@ -1,0 +1,125 @@
+:root {
+  /* 品牌主色：暖橙（教培行业亲和感），辅助色：专业蓝 */
+  --el-color-primary: #ff7a45;
+  --el-color-primary-light-3: #ffa580;
+  --el-color-primary-light-5: #ffc1a6;
+  --el-color-primary-light-7: #ffdcc9;
+  --el-color-primary-light-8: #ffe8dc;
+  --el-color-primary-light-9: #fff3ec;
+  --el-color-primary-dark-2: #e35f2e;
+
+  --brand-blue: #2f6fed;
+  --brand-ink: #1f2329;
+  --brand-sub: #5b6472;
+  --brand-muted: #8a94a6;
+  --brand-line: #eceef2;
+  --brand-bg: #f6f7f9;
+  --brand-success: #22a06b;
+  --brand-warning: #e6a23c;
+  --brand-danger: #e34d59;
+
+  --radius-card: 14px;
+  --shadow-card: 0 4px 16px rgba(31, 35, 41, 0.06);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  color: var(--brand-ink);
+  background: var(--brand-bg);
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.page {
+  width: 100%;
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 20px 16px 48px;
+}
+
+.card {
+  background: #fff;
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 20px;
+}
+
+.card + .card {
+  margin-top: 16px;
+}
+
+.card-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.card-title .sub {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--brand-muted);
+}
+
+.muted {
+  color: var(--brand-muted);
+}
+
+.flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.text-ellipsis {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.el-button--primary {
+  --el-button-bg-color: var(--el-color-primary);
+  --el-button-border-color: var(--el-color-primary);
+}
+
+/* ---------------- 移动端弹窗 / 抽屉自适应 ---------------- */
+/* 统一把固定像素宽度的 el-dialog / el-drawer 在小屏改为视口比例，
+   避免内容在小屏手机上超出视口被裁切（覆盖组件内联 width）。 */
+@media (max-width: 768px) {
+  .el-dialog {
+    --el-dialog-width: 92vw !important;
+    width: 92vw !important;
+    max-width: 92vw !important;
+    max-height: 88vh !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .el-dialog__body {
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .el-drawer {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+}

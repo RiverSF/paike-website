@@ -1,0 +1,31 @@
+# 后端非敏感配置（对应 server/internal/conf/app.ini，环境变量优先级更高）
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tutoring-config
+  namespace: tutoring
+data:
+  RUN_MODE: "release"
+  HTTP_PORT: "9090"
+  # k8s 模式前端由 web(nginx) Pod 托管，后端关闭静态托管；单机部署时改为 ../web/dist
+  STATIC_DIR: "none"
+  LOG_STDOUT: "1"
+  CONFIG_PATH: "/app/internal/conf/app.ini"
+  APP_ROOT: "/app"
+  UPLOAD_DIR: "data/uploads"
+
+  PG_HOST: "postgres"
+  PG_PORT: "5432"
+  PG_USER: "postgres"
+  PG_DB: "tutoring"
+  PG_SSLMODE: "disable"
+
+  JWT_EXPIRE_HOURS: "168"
+
+  # CORS：允许跨域访问的前端源（逗号分隔）。留空表示拒绝一切跨域请求（仅同源可用），
+  # 切勿设为 * 或包含通配。上线请改为你的前端域名，例如：
+  # CORS_ALLOW_ORIGINS: "https://www.river.site"
+  # CORS_ALLOW_ORIGINS: ""
+
+  POSTGRES_DB: "tutoring"
+  POSTGRES_USER: "postgres"

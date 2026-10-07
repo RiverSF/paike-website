@@ -1,0 +1,37 @@
+# 后端：Gin 服务（多阶段构建，构建上下文为仓库根目录）
+FROM golang:1.23-alpine AS builder
+
+WORKDIR /src
+COPY server/go.mod server/go.sum ./
+RUN go mod download
+
+COPY server/ .
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/tutoring-server .
+
+FROM alpine:3.20
+
+RUN apk add --no-cache ca-certificates tzdata && \
+    ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
+
+WORKDIR /app
+COPY --from=builder /out/tutoring-server /app/tutoring-server
+COPY server/internal/conf/app.ini.example /app/internal/conf/app.ini
+
+RUN mkdir -p /app/data/uploads
+
+ENV RUN_MODE=release \
+    HTTP_PORT=9090 \
+    CONFIG_PATH=/app/internal/conf/app.ini \
+    APP_ROOT=/app \
+    STATIC_DIR=none \
+    LOG_STDOUT=1 \
+    PG_HOST=postgres \
+    PG_PORT=5432 \
+    PG_USER=postgres \
+    PG_PASSWORD=postgres \
+    PG_DB=tutoring \
+    PG_SSLMODE=disable
+
+EXPOSE 9090
+
+CMD ["/app/tutoring-server"]

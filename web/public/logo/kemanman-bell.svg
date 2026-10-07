@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 208 48" fill="none">
+  <g transform="translate(6,4)">
+    <path d="M18 3C10 3 5 9 5 18c0 6-3 8-3 11h32c0-3-3-5-3-11 0-9-5-15-13-15z" fill="#FF7A1A"/>
+    <path d="M18 4c-7 2-11 8-11 14" stroke="#FFB36B" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <circle cx="18" cy="35" r="3.4" fill="#FF7A1A"/>
+    <circle cx="29" cy="7" r="3.2" fill="#FF4D4F"/>
+  </g>
+  <text x="52" y="33" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="26" font-weight="700" fill="#FF7A1A">课满满</text>
+</svg>
