@@ -7,6 +7,7 @@ server/logs/
 server/data/
 server/tmp/
 server/bin/
+server/tutoring-server
 *.log
 
 # 本地配置（含密码等敏感信息，可按需提交）

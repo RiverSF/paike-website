@@ -4,6 +4,11 @@
 -- 服务启动时 model.EnsureNotNull / EnsureIndexes / EnsureComments 会自动执行同样的逻辑，
 -- 本文件用于已有库手工一次性执行 / 审阅结构。
 --
+-- ⚠️ 存档说明（2026-10-08）：
+--   1. 本文件的索引与非空规则已整体迁入 server/internal/model/schema.go、注释迁入 comments.go，
+--      新库无需执行，已有库以代码为准（本文件仅作历史审阅，不再维护）。
+--   2. 其中 email、invite_code 相关语句已被 015_drop_invite_code_and_email.sql 作废，执行会失败或无效。
+--
 -- 约定：所有业务字段均不允许 NULL。
 --   字符串 → ''   数值 → 0   布尔 → false   枚举 / 状态 → 业务默认值
 --   order.published_at 为零值时间（0001-01-01）表示「未填写」
