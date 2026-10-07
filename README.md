@@ -1,5 +1,10 @@
 # 排课助手 · 课程排期与课表管理
 
+![vibe coding](https://img.shields.io/badge/vibe--coding-AI%20%E9%A9%B1%E5%8A%A8-ff69b4)
+![Vue 3](https://img.shields.io/badge/Vue-3-42b883)
+![Go](https://img.shields.io/badge/Go-Gin-00add8)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14+-336791)
+
 面向家长、老师与个人的排课工具：录入课程后，系统按「补课周期 + 每周时段」自动生成周课表。
 
 - 前端：Vue 3 + Vite + Element Plus + Pinia
@@ -8,6 +13,18 @@
 - 部署：单机部署 / Kubernetes 部署（两种可切换，见下文）
 
 导航栏：**首页 / 订单 / 课表 / 使用指南**，右上角头像可查看个人信息与会员信息。前端访问端口为 **80**。
+
+## 功能演示
+
+<video src="docs/demo/demo.mp4" poster="docs/demo/demo-cover.png" controls muted width="100%"></video>
+
+> 视频源文件在 `docs/demo/`（`demo.mp4` 与封面 `demo-cover.png`）；站内的演示视频由 `web/public/videos/guide-demo.mp4` 单独维护。
+> 若此处无法播放，可直接打开 [docs/demo/demo.mp4](docs/demo/demo.mp4)。
+
+## Vibe Coding
+
+本项目采用 **Vibe Coding** 方式开发：人提出需求与约束，AI 负责写代码、重构与文档，人负责验证结果和做取舍。
+整套系统（前端、后端、部署编排、文档）都是在这种人机对话循环中增量长出来的，因此代码以「能跑通、易改」为先，欢迎直接提 issue 或 PR 继续迭代。
 
 > 使用身份：用户表 `user_role` 字段（`teacher` 老师 / `parent` 家长 / `personal` 个人 / `org` 机构），注册时选择，**仅影响课程表单字段与文案**（家长隐藏「信息来源 / 发布人 / 发布时间」，个人隐藏「课程编号 / 学生性别」并把「年级」改为「课程类型」、「学生姓名」改为「课程名称」），**不参与计费**；计费仍由师资身份 `teacher_type` 决定：大学生家教（需上传学生证与身份证并通过审核）享学生折扣，其余身份（含机构）统一走标准价。仅「老师」可选择大学生家教身份。
 >
@@ -40,6 +57,7 @@ tutoring-website/
 │   │   └── router/           路由注册 + SPA 托管
 │   ├── migrations/           初始化 SQL（启动也会自动 AutoMigrate）
 │   └── pkg/                  日志、路径、通用工具
+├── docs/                     文档：部署安全加固、产品设计说明、演示视频（docs/demo/）
 ├── deploy/
 │   ├── docker/               两个 Dockerfile（server / web 镜像）
 │   ├── k8s/                  k8s 编排：namespace / configmap / secret / postgres / server / web / ingress
@@ -59,12 +77,12 @@ tutoring-website/
 | 课表 | 按自然周展示（默认当前周），x 轴周一~周日、y 轴按小时；课程按「时间范围 + 每周时段」自动展开；备注较长的课程用红点标记，鼠标悬浮查看完整信息；支持上一周/本周/下一周与日期选择器切换 |
 | 使用指南 | 使用提示、常见问题 FAQ、反馈提交框与已反馈内容列表 |
 | 角色 | `user` 普通用户 / `admin` 管理员 / `owner` 站点拥有者；**ID=1 的用户为站点拥有者**，具备管理员权限且为永久会员 |
-| 注册/会员 | **手机号必填**（11 位中国大陆号码，与邮箱均做查重与格式校验），注册即送 **30 天免费会员**；课程与课表仅对会员未过期用户开放；支持包月 / 包年续费 |
-| 登录方式 | 用户名 / 手机号 / 邮箱 均可登录 |
+| 注册/会员 | **手机号必填**（11 位中国大陆号码，做查重与格式校验），注册即送 **30 天免费会员**；课程与课表仅对会员未过期用户开放；支持包月 / 包年续费 |
+| 登录方式 | **手机号 + 密码**（用户名不能登录）；手机号每月仅可修改一次 |
 | 管理端 | 站点拥有者、管理员可见「会员管理」「用户反馈」两个菜单：会员管理含用户列表（冻结/解冻、**充值续费**）与注册/会员趋势图；用户反馈含答复与审核 |
 | 充值与累计 | **自助续费入口已关闭**，续费统一由管理员在会员管理中填写**充值金额**与**续费时长（一月/一年）**；系统自动在原到期时间上顺延、累加**累计充值金额**并生成充值记录；个人中心可查看每次充值金额、时长与到期变化 |
 | 会员价格 | 两档：**标准价**（老师 / 家长 / 个人 / 机构，默认包月 79 / 包季 225 / 包年 790）+ **大学生折扣价**（标准价 × 折扣 8.5 折向上取整，需认证）；机构当前与个人老师同价；用户扫码支付后联系管理员人工开通 |
-| 个人中心 | 注册信息（用户名、头像、手机号、邮箱、注册时长）+ 会员信息（会员类型、包月/包年、有效时段、剩余天数） |
+| 个人中心 | 注册信息（用户名、头像、手机号、注册时长）+ 会员信息（会员类型、包月/包年、有效时段、剩余天数） |
 
 ---
 
@@ -257,6 +275,7 @@ k8s 部署时无需改 ini 文件，环境变量由 `deploy/k8s/01-configmap.yam
 | — | `APP_ROOT` | 应用根目录（二进制部署使用） |
 | — | `LOG_STDOUT` | `=1` 时日志只输出到标准输出 |
 | — | `CORS_ALLOW_ORIGINS` | 逗号分隔的允许跨域源，默认允许全部 |
+| `server.TRUSTED_PROXIES` | `TRUSTED_PROXIES` | 可信反向代理 IP / CIDR（逗号分隔），只有它们的 `X-Forwarded-For` 会被采信；留空＝不信任代理（客户端 IP 取连接地址）。nginx / ingress 部署时应填私网段，否则注册与登录的 IP 限流会被绕过或误伤 |
 
 ---
 
@@ -267,7 +286,7 @@ k8s 部署时无需改 ini 文件，环境变量由 `deploy/k8s/01-configmap.yam
 | POST | `/api/user/register` | 注册（送 30 天会员） | 公开 |
 | POST | `/api/user/login` | 登录 | 公开 |
 | GET | `/api/user/profile` | 个人信息 + 会员信息（含 `role`/`roleName`/`isStaff`） | 登录 |
-| PUT | `/api/user/profile` | 修改头像/手机号/邮箱 | 登录 |
+| PUT | `/api/user/profile` | 修改头像/用户名/手机号 | 登录 |
 | POST | `/api/user/member/activate` | 已关闭（返回 403），续费统一由管理员后台操作 | — |
 | POST | `/api/upload` | 上传图片（头像） | 登录 |
 | GET | `/api/orders` | 订单列表（分页/状态/关键词/年级） | 会员 |
@@ -308,7 +327,7 @@ k8s 部署时无需改 ini 文件，环境变量由 `deploy/k8s/01-configmap.yam
   - `002_role.sql` 角色字段 + ID=1 拥有者初始化
   - `003_comments.sql` 仅注释（已有库可直接执行补全）
   - `004_timestamp.sql` 已有库的时间字段转为时间戳（`EXTRACT(EPOCH)` 无损转换，需停机执行一次）
-  - `005_user_status.sql` 账号状态字段（冻结）+ 手机号/邮箱唯一索引
+  - `005_user_status.sql` 账号状态字段（冻结）+ 手机号唯一索引
   - `006_recharge.sql` 累计充值金额字段 + 充值记录表 `recharge`
 
 ---
