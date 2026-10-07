@@ -16,10 +16,9 @@
 
 ## 功能演示
 
-<video src="docs/demo/demo.mp4" poster="docs/demo/demo-cover.png" controls muted width="100%"></video>
+<video src="web/public/videos/guide-demo.mp4" controls width="100%"></video>
 
-> 视频源文件在 `docs/demo/`（`demo.mp4` 与封面 `demo-cover.png`）；站内的演示视频由 `web/public/videos/guide-demo.mp4` 单独维护。
-> 若此处无法播放，可直接打开 [docs/demo/demo.mp4](docs/demo/demo.mp4)。
+> 演示视频为最新版（`web/public/videos/guide-demo.mp4`，与前端「使用指南」页同款，播放前为 logo 封面层）；旧版归档已移除。若此处无法播放，可直接打开该文件。
 
 ## Vibe Coding
 
