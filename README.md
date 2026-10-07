@@ -16,9 +16,10 @@
 
 ## 功能演示
 
-<video src="web/public/videos/guide-demo.mp4" controls width="100%"></video>
+[![功能演示](web/public/videos/guide-demo-cover.png)](https://github.com/RiverSF/paike-website/raw/main/web/public/videos/guide-demo.mp4)
 
-> 演示视频为最新版（`web/public/videos/guide-demo.mp4`，与前端「使用指南」页同款，播放前为 logo 封面层）；旧版归档已移除。若此处无法播放，可直接打开该文件。
+> 点击上方封面查看最新演示视频（约 50 秒，与前端「使用指南 / 首页」同款）。视频源文件：`web/public/videos/guide-demo.mp4`。
+> GitHub 仓库页不渲染 `<video>`，故此处用封面图链接跳转 raw 视频；本地 IDE 预览可直接嵌入播放。
 
 ## Vibe Coding
 
