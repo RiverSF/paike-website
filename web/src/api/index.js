@@ -50,11 +50,7 @@ export const adminApi = {
   resetPassword: (id, password) => request.put(`/admin/users/${id}/password`, { password }),
   removeUser: (id) => request.delete(`/admin/users/${id}`), // 删除账号（仅站长）
   feedbacks: (params, opts) => request.get('/admin/feedbacks', { params, ...opts }),
-  replyFeedback: (id, payload) => request.put(`/admin/feedbacks/${id}`, payload),
-  inviteCodes: (params) => request.get('/admin/invite-codes', { params }),
-  createInviteCode: (data) => request.post('/admin/invite-codes', data),
-  deleteInviteCode: (id) => request.delete(`/admin/invite-codes/${id}`),
-  invalidateInviteCode: (id) => request.put(`/admin/invite-codes/${id}/invalidate`)
+  replyFeedback: (id, payload) => request.put(`/admin/feedbacks/${id}`, payload)
 }
 
 export const priceApi = {

@@ -24,6 +24,10 @@ type serverConfig struct {
 	ServerPort   int
 	ReadTimeout  int
 	WriteTimeout int
+	// TrustedProxies 可信反向代理地址（IP / CIDR），来自这些地址的 X-Forwarded-For 才会被采信。
+	// 留空表示不信任任何代理：此时客户端 IP 取 TCP 连接地址，避免伪造 XFF 绕过 IP 限流。
+	// 部署在 nginx / ingress 之后时，必须填入代理地址（如 127.0.0.1、10.0.0.0/8），否则限流会把所有请求视为同一 IP。
+	TrustedProxies []string
 }
 
 type postgresConfig struct {
@@ -41,28 +45,11 @@ type jwtConfig struct {
 	ExpireHours int
 }
 
-// inviteConfig 注册准入与邀请推广开关。
-// Mode 是全站唯一的准入降级开关：出现刷号时改回 manual 重启即可回到人工发码，无需改代码。
-type inviteConfig struct {
-	// Mode：manual=仅管理员人工发码（现行，最严）；member=开放会员自助发码/邀请链接
-	Mode string
-	// MemberMonthlyQuota：会员每月可生成的邀请凭证数量（mode=member 生效）
-	MemberMonthlyQuota int
-	// MemberCodeExpireDays：会员生成的邀请码有效期（天），过期未注册自动失效回收
-	MemberCodeExpireDays int
-	// WechatLoginEnabled：是否启用微信授权注册/登录（需先具备开放平台或公众号资质）
-	WechatLoginEnabled bool
-	// TrialDaysInvite / TrialDaysWechat：不同来源注册的初始试用天数
-	TrialDaysInvite int
-	TrialDaysWechat int
-}
-
 var (
 	AppConfig      *appConfig
 	ServerConfig   *serverConfig
 	PostgresConfig *postgresConfig
 	JwtConfig      *jwtConfig
-	InviteConfig   *inviteConfig
 )
 
 func Init() error {
@@ -78,9 +65,10 @@ func Init() error {
 	}
 
 	ServerConfig = &serverConfig{
-		ServerPort:   envIntOrDefault("HTTP_PORT", cfg.Section("server").Key("HTTP_PORT").MustInt(9090)),
-		ReadTimeout:  envIntOrDefault("READ_TIMEOUT", cfg.Section("server").Key("READ_TIMEOUT").MustInt(60)),
-		WriteTimeout: envIntOrDefault("WRITE_TIMEOUT", cfg.Section("server").Key("WRITE_TIMEOUT").MustInt(60)),
+		ServerPort:     envIntOrDefault("HTTP_PORT", cfg.Section("server").Key("HTTP_PORT").MustInt(9090)),
+		ReadTimeout:    envIntOrDefault("READ_TIMEOUT", cfg.Section("server").Key("READ_TIMEOUT").MustInt(60)),
+		WriteTimeout:   envIntOrDefault("WRITE_TIMEOUT", cfg.Section("server").Key("WRITE_TIMEOUT").MustInt(60)),
+		TrustedProxies: splitList(envOrDefault("TRUSTED_PROXIES", cfg.Section("server").Key("TRUSTED_PROXIES").String())),
 	}
 
 	PostgresConfig = &postgresConfig{
@@ -103,15 +91,6 @@ func Init() error {
 		AppConfig.Host = "http://127.0.0.1:" + strconv.Itoa(ServerConfig.ServerPort)
 	}
 	AppConfig.LocalHost = AppConfig.Host
-
-	InviteConfig = &inviteConfig{
-		Mode:                 envOrDefault("INVITE_MODE", cfg.Section("invite").Key("MODE").MustString("manual")),
-		MemberMonthlyQuota:   envIntOrDefault("INVITE_MEMBER_MONTHLY_QUOTA", cfg.Section("invite").Key("MEMBER_MONTHLY_QUOTA").MustInt(3)),
-		MemberCodeExpireDays: envIntOrDefault("INVITE_MEMBER_CODE_EXPIRE_DAYS", cfg.Section("invite").Key("MEMBER_CODE_EXPIRE_DAYS").MustInt(7)),
-		WechatLoginEnabled:   envBoolOrDefault("WECHAT_LOGIN_ENABLED", cfg.Section("invite").Key("WECHAT_LOGIN_ENABLED").MustBool(false)),
-		TrialDaysInvite:      envIntOrDefault("TRIAL_DAYS_INVITE", cfg.Section("invite").Key("TRIAL_DAYS_INVITE").MustInt(30)),
-		TrialDaysWechat:      envIntOrDefault("TRIAL_DAYS_WECHAT", cfg.Section("invite").Key("TRIAL_DAYS_WECHAT").MustInt(7)),
-	}
 
 	return nil
 }
@@ -142,14 +121,14 @@ func envIntOrDefault(key string, fallback int) int {
 	return n
 }
 
-func envBoolOrDefault(key string, fallback bool) bool {
-	v := os.Getenv(key)
-	if v == "" {
-		return fallback
+// splitList 解析逗号分隔的配置项（如 TRUSTED_PROXIES = 127.0.0.1,10.0.0.0/8），返回非空项。
+func splitList(v string) []string {
+	parts := strings.Split(v, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if s := strings.TrimSpace(p); s != "" {
+			out = append(out, s)
+		}
 	}
-	b, err := strconv.ParseBool(v)
-	if err != nil {
-		return fallback
-	}
-	return b
+	return out
 }

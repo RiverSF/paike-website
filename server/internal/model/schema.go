@@ -28,7 +28,6 @@ var notNullRules = []columnRule{
 	{"user", "password", "''"},
 	{"user", "avatar", "''"},
 	{"user", "phone", "''"},
-	{"user", "email", "''"},
 	{"user", "user_role", "'teacher'"},
 	{"user", "teacher_type", "'professional'"},
 	{"user", "reg_teacher_type", "''"},
@@ -159,14 +158,6 @@ var notNullRules = []columnRule{
 	{"price_config", "renewal_discount", "0.9"},
 	{"price_config", "updated_at", "0"},
 
-	// ---------- invite_code ----------
-	{"invite_code", "code", "''"},
-	{"invite_code", "phone", "''"},
-	{"invite_code", "used", "0"},
-	{"invite_code", "used_by_id", "0"},
-	{"invite_code", "used_at", "0"},
-	{"invite_code", "created_at", "0"},
-
 	// ---------- message ----------
 	{"message", "user_id", "0"},
 	{"message", "sender_id", "0"},
@@ -181,7 +172,6 @@ var notNullRules = []columnRule{
 	{"student_application", "user_id", "0"},
 	{"student_application", "username", "''"},
 	{"student_application", "phone", "''"},
-	{"student_application", "invite_code", "''"},
 	{"student_application", "student_card_url", "''"},
 	{"student_application", "id_card_url", "''"},
 	{"student_application", "status", "'pending'"},
@@ -230,9 +220,6 @@ var dropIndexSQLs = []string{
 	// user：学生身份两个单列索引合并为 (teacher_type, student_expire_at)
 	`DROP INDEX IF EXISTS idx_user_student_verified_at`,
 	`DROP INDEX IF EXISTS idx_user_student_expire_at`,
-
-	// invite_code：phone 普通索引升级为部分唯一索引 uk_invite_phone
-	`DROP INDEX IF EXISTS idx_invite_phone`,
 }
 
 // createIndexSQLs 按实际查询路径建立的索引（全部 IF NOT EXISTS，可重复执行）。
@@ -244,14 +231,12 @@ var dropIndexSQLs = []string{
 var createIndexSQLs = []string{
 	// ---------- user ----------
 	`CREATE UNIQUE INDEX IF NOT EXISTS idx_user_phone ON "user" (phone) WHERE phone <> ''`,
-	`CREATE UNIQUE INDEX IF NOT EXISTS idx_user_email ON "user" (email) WHERE email <> ''`,
 	`CREATE INDEX IF NOT EXISTS idx_user_created_at ON "user" (created_at)`,
 	`CREATE INDEX IF NOT EXISTS idx_user_member_expire ON "user" (member_expire)`,
 	`CREATE INDEX IF NOT EXISTS idx_user_role_status ON "user" (role, status)`,
 	`CREATE INDEX IF NOT EXISTS idx_user_teacher_verified ON "user" (teacher_type, verified)`,
 	`CREATE INDEX IF NOT EXISTS idx_user_student_expire ON "user" (teacher_type, student_expire_at)`,
-	// 邀请归因与风控：按推荐人统计、按注册 IP 查聚集
-	`CREATE INDEX IF NOT EXISTS idx_user_invited_by ON "user" (invited_by_id)`,
+	// 风控：按注册 IP 查聚集
 	`CREATE INDEX IF NOT EXISTS idx_user_register_ip ON "user" (register_ip)`,
 
 	// ---------- order ----------
@@ -286,12 +271,6 @@ var createIndexSQLs = []string{
 	// ---------- student_application ----------
 	`CREATE INDEX IF NOT EXISTS idx_app_user_status ON student_application (user_id, status, id DESC)`,
 	`CREATE INDEX IF NOT EXISTS idx_app_status_id ON student_application (status, id DESC)`,
-
-	// ---------- invite_code ----------
-	// 手机号改为唯一索引（WHERE phone <> ''）：会员分享码不绑手机号，允许多条空 phone，
-	// 但人工发码必须保证「一个手机号一个码」，应用层查重挡不住并发。
-	`CREATE UNIQUE INDEX IF NOT EXISTS uk_invite_phone ON invite_code (phone) WHERE phone <> ''`,
-	`CREATE INDEX IF NOT EXISTS idx_invite_used_by ON invite_code (used_by_id)`,
 }
 
 // EnsureNotNull 为已有库补齐默认值与非空约束（幂等）。

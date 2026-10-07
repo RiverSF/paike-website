@@ -27,5 +27,11 @@ data:
   # CORS_ALLOW_ORIGINS: "https://www.river.site"
   # CORS_ALLOW_ORIGINS: ""
 
+  # 可信反向代理（逗号分隔的 IP / CIDR）：只有来自这些地址的 X-Forwarded-For 才会被采信。
+  # 本集群「ingress/nginx → server」链路的来源都在私网段内，故默认填私网段；
+  # 注册/登录的 IP 限流与「注册 IP」记录依赖真实客户端 IP，配错会导致所有请求被视为同一 IP。
+  # 若 server 直接对外暴露（无代理），请删掉该项（留空＝不信任任何代理，最安全）。
+  TRUSTED_PROXIES: "127.0.0.1/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+
   POSTGRES_DB: "tutoring"
   POSTGRES_USER: "postgres"

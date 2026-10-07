@@ -39,6 +39,9 @@ const (
 	uploadRateMax       = 20
 )
 
+// uploadRateMaxKeys 记录上限：超过则清理已过窗口的 IP，防止 map 无限增长（内存保护）
+const uploadRateMaxKeys = 20000
+
 var (
 	uploadMu    sync.Mutex
 	uploadCount = map[string]int{}
@@ -54,6 +57,14 @@ func uploadRateAllow(ip string) bool {
 		uploadCount[ip] = 0
 	}
 	uploadCount[ip]++
+	if len(uploadStart) > uploadRateMaxKeys {
+		for k, s := range uploadStart {
+			if now-s >= uploadRateWindowSec {
+				delete(uploadStart, k)
+				delete(uploadCount, k)
+			}
+		}
+	}
 	return uploadCount[ip] <= uploadRateMax
 }
 
@@ -62,7 +73,7 @@ func uploadRateAllow(ip string) bool {
 func Upload(c *gin.Context) {
 	// 匿名上传频控（按客户端 IP），防止未登录接口被滥用耗尽存储
 	if !uploadRateAllow(c.ClientIP()) {
-		Fail(c, 429, "上传过于频繁，请稍后再试")
+		Fail(c, CodeTooManyRequest, "上传过于频繁，请稍后再试")
 		return
 	}
 

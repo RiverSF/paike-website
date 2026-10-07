@@ -34,9 +34,8 @@ const routes = [
     component: () => import('@/views/AdminMembersView.vue'),
     meta: { title: '管理中心', requiresStaff: true }
   },
-  // 用户反馈 / 邀请码已合并进「会员管理」的二级导航，旧入口重定向到对应页签
+  // 用户反馈已合并进「会员管理」的二级导航，旧入口重定向到对应页签
   { path: '/admin/feedbacks', redirect: '/admin/members?tab=feedback' },
-  { path: '/admin/invite-codes', redirect: '/admin/members?tab=invite' },
   { path: '/:pathMatch(.*)*', redirect: '/' }
 ]
 

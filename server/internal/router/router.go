@@ -18,6 +18,11 @@ import (
 // New 创建 HTTP 引擎：中间件、API 路由、上传目录与前端静态资源。
 func New() *gin.Engine {
 	r := gin.New()
+	// 反向代理信任：只采信可信代理带来的 X-Forwarded-For，否则客户端 IP 直接取 TCP 连接地址。
+	// 不做该配置时 Gin 默认信任所有代理，请求头可被伪造，导致注册/登录的 IP 限流被绕过。
+	if err := r.SetTrustedProxies(config.ServerConfig.TrustedProxies); err != nil {
+		logger.Error("set trusted proxies failed, err=%s", err.Error())
+	}
 	r.Use(gin.Recovery())
 	r.Use(middleware.SecurityHeaders())
 	r.Use(middleware.CorsMiddleware())
@@ -83,22 +88,18 @@ func registerAPI(r *gin.Engine) {
 				staff.PUT("/users/:id/freeze", handler.AdminFreeze)
 				staff.PUT("/users/:id/member", handler.AdminRenew)
 				staff.PUT("/users/:id/role", handler.AdminSetRole)
-				staff.DELETE("/users/:id", handler.AdminDeleteUser)                  // 删除账号（仅站长）
+				staff.DELETE("/users/:id", handler.AdminDeleteUser)          // 删除账号（仅站长）
 				staff.PUT("/users/:id/password", handler.AdminResetPassword) // 为普通用户重置登录密码
-				staff.POST("/messages", handler.AdminSendMessage)           // 发送站内信（指定用户或全员）
+				staff.POST("/messages", handler.AdminSendMessage)            // 发送站内信（指定用户或全员）
 				staff.GET("/feedbacks", handler.AdminFeedbacks)
 				staff.PUT("/feedbacks/:id", handler.AdminFeedbackReply)
-				staff.PUT("/price", handler.AdminUpdatePrice)                                // 调整会员价格（整体，兼容）
-				staff.POST("/price/card", handler.AdminUpdatePriceCard)                      // 按卡片调整价格 / 折扣（支持生效时间）
-				staff.GET("/price/schedules", handler.AdminListPriceSchedules)               // 待生效价格预约列表
-				staff.DELETE("/price/schedules/:id", handler.AdminCancelPriceSchedule)       // 撤销待生效预约
-				staff.GET("/price/impact", handler.AdminPriceImpact)                         // 价格通知预计触达人数
-				staff.GET("/price/history", handler.AdminPriceHistory)                       // 价格变更历史
-				staff.POST("/price/history/:id/rollback", handler.AdminRollbackPrice)        // 按历史记录回滚
-				staff.GET("/invite-codes", handler.AdminListInviteCodes)                     // 邀请码列表
-				staff.POST("/invite-codes", handler.AdminCreateInviteCode)                   // 生成邀请码
-				staff.DELETE("/invite-codes/:id", handler.AdminDeleteInviteCode)             // 删除未使用邀请码
-				staff.PUT("/invite-codes/:id/invalidate", handler.AdminInvalidateInviteCode) // 作废邀请码（保留记录）
+				staff.PUT("/price", handler.AdminUpdatePrice)                          // 调整会员价格（整体，兼容）
+				staff.POST("/price/card", handler.AdminUpdatePriceCard)                // 按卡片调整价格 / 折扣（支持生效时间）
+				staff.GET("/price/schedules", handler.AdminListPriceSchedules)         // 待生效价格预约列表
+				staff.DELETE("/price/schedules/:id", handler.AdminCancelPriceSchedule) // 撤销待生效预约
+				staff.GET("/price/impact", handler.AdminPriceImpact)                   // 价格通知预计触达人数
+				staff.GET("/price/history", handler.AdminPriceHistory)                 // 价格变更历史
+				staff.POST("/price/history/:id/rollback", handler.AdminRollbackPrice)  // 按历史记录回滚
 			}
 
 			// 会员未过期才能执行写操作（查看类接口已在 auth 组放开）

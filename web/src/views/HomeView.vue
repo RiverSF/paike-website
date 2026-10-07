@@ -389,9 +389,24 @@ async function loadWeekPreview() {
   }
 }
 
-// 跳转课表详情：登录与免注册试用均可查看（会员过期只读）
+// 预览卡片右侧入口：按当前状态跳转到匹配的页面
+// - 已有课表数据 → 课表页查看完整课表
+// - 已登录但暂无课程 → 课程安排页并直接打开「添加课程」，避免跳到空课表页无事可做
+// - 未登录 → 打开注册弹窗（按钮文案承诺的就是注册）
 function goSchedule() {
-  router.push('/schedule')
+  if (hasRealWeek.value) {
+    router.push('/schedule')
+    return
+  }
+  if (userStore.isLogin) {
+    router.push({ path: '/orders', query: { new: '1' } })
+    return
+  }
+  window.dispatchEvent(
+    new CustomEvent('open-auth', {
+      detail: { mode: 'register', tip: '注册后，这里会用你的课程数据生成真实课表。' }
+    })
+  )
 }
 
 // 二维码图片见 src/config/site.js

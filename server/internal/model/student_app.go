@@ -29,7 +29,6 @@ type StudentApplication struct {
 	UserID         uint   `gorm:"not null" json:"userId"`
 	Username       string `gorm:"size:64;not null" json:"username"`
 	Phone          string `gorm:"size:32;not null" json:"phone"`
-	InviteCode     string `gorm:"size:16;not null" json:"inviteCode"`
 	StudentCardURL string `gorm:"size:255;not null" json:"studentCardUrl"`
 	IdCardURL      string `gorm:"size:255;not null" json:"idCardUrl"`
 	Status         string `gorm:"size:16;not null;default:pending" json:"status"` // pending / approved / rejected
@@ -120,7 +119,7 @@ func (m *StudentApplicationModel) List(q StudentAppQuery) ([]StudentApplication,
 	}
 	if kw := strings.TrimSpace(q.Keyword); kw != "" {
 		like := "%" + kw + "%"
-		tx = tx.Where("username ILIKE ? OR phone ILIKE ? OR invite_code ILIKE ?", like, like, like)
+		tx = tx.Where("username ILIKE ? OR phone ILIKE ?", like, like)
 	}
 	var total int64
 	if err := tx.Count(&total).Error; err != nil {
@@ -181,15 +180,10 @@ func BackfillStudentApplications() error {
 		if cnt > 0 {
 			continue
 		}
-		code := ""
-		if m, err := NewInviteCodeModel().CodeMapByUserIDs([]uint{u.ID}); err == nil {
-			code = m[u.ID]
-		}
 		app := &StudentApplication{
 			UserID:         u.ID,
 			Username:       u.Username,
 			Phone:          u.Phone,
-			InviteCode:     code,
 			StudentCardURL: u.StudentCardURL,
 			IdCardURL:      u.IdCardURL,
 			Status:         StudentAppPending,

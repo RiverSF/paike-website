@@ -8,12 +8,13 @@ import (
 
 // 业务状态码
 const (
-	CodeOK           = 0
-	CodeBadRequest   = 400
-	CodeUnauthorized = 401
-	CodeForbidden    = 403
-	CodeNotFound     = 404
-	CodeServerError  = 500
+	CodeOK             = 0
+	CodeBadRequest     = 400
+	CodeUnauthorized   = 401
+	CodeForbidden      = 403
+	CodeNotFound       = 404
+	CodeTooManyRequest = 429
+	CodeServerError    = 500
 )
 
 type Response struct {

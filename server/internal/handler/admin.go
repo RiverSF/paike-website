@@ -34,7 +34,6 @@ func AdminUsers(c *gin.Context) {
 		Role:          c.Query("role"),
 		Status:        c.Query("status"),
 		MemberType:    c.Query("memberType"),
-		InviteCode:    c.Query("inviteCode"),
 		OnlyActive:    onlyActive,
 		Page:          page,
 		PageSize:      pageSize,
@@ -46,28 +45,15 @@ func AdminUsers(c *gin.Context) {
 		return
 	}
 
-	// 批量取邀请码，附到每条用户记录
-	ids := make([]uint, 0, len(list))
-	for i := range list {
-		ids = append(ids, list[i].ID)
-	}
-	codeMap, cerr := model.NewInviteCodeModel().CodeMapByUserIDs(ids)
-	if cerr != nil {
-		logger.Error("load invite codes failed, err=%s", cerr.Error())
-		codeMap = map[uint]string{}
-	}
-
 	items := make([]gin.H, 0, len(list))
 	for i := range list {
-		vo := adminUserVO(&list[i])
-		vo["inviteCode"] = codeMap[list[i].ID]
-		items = append(items, vo)
+		items = append(items, adminUserVO(&list[i]))
 	}
 	OK(c, PageData{List: items, Total: total, Page: page, PageSize: pageSize})
 }
 
-// AdminCreateAdmin 站点拥有者添加管理员：仅需填写登录信息（用户名 + 密码）。
-// 管理员无需邀请码与手机号，创建后即为永久会员，站点功能不受会员有效期限制。
+// AdminCreateAdmin 站点拥有者添加管理员：仅需填写登录信息（用户名 + 手机号 + 密码）。
+// 管理员创建后即为永久会员，站点功能不受会员有效期限制。
 func AdminCreateAdmin(c *gin.Context) {
 	viewer := middleware.CurrentUser(c)
 	if viewer == nil {
@@ -133,7 +119,7 @@ func AdminCreateAdmin(c *gin.Context) {
 		MemberStart:    now.Unix(),
 		MemberExpire:   model.PermanentExpireUnix(),
 		Role:           model.RoleAdmin,
-		UserRole:       "", // 管理员不绑定使用身份，统一按老师渲染
+		UserRole:       "",                     // 管理员不绑定使用身份，统一按老师渲染
 		RegisterSrc:    model.RegisterSrcAdmin, // 人工开通
 	}
 	if err := um.Create(u); err != nil {
@@ -605,7 +591,6 @@ func adminUserVO(u *model.User) gin.H {
 		"id":             u.ID,
 		"username":       u.Username,
 		"phone":          u.Phone,
-		"email":          u.Email,
 		"avatar":         u.Avatar,
 		"role":           u.Role,
 		"roleName":       roleName,

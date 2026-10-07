@@ -1,16 +1,14 @@
 package handler
 
 import (
-	"errors"
 	"fmt"
 	"regexp"
-	
+
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
-	"gorm.io/gorm"
 
 	"tutoring_server/internal/middleware"
 	"tutoring_server/internal/model"
@@ -20,23 +18,15 @@ import (
 // 注册赠送的免费会员天数
 const trialDays = 30
 
-// errInviteRace 邀请码在本次注册过程中被并发抢先核销，事务需整体回滚。
-var errInviteRace = errors.New("invite code already used")
-
 // 中国大陆手机号
 var phoneRegexp = regexp.MustCompile(`^1[3-9]\d{9}$`)
 
-// 邮箱
-var emailRegexp = regexp.MustCompile(`^[\w.+-]+@[\w-]+(\.[\w-]+)+$`)
-
 type registerReq struct {
-	Username   string `json:"username" binding:"required,min=2,max=32"`
-	Password   string `json:"password" binding:"required,min=6,max=32"`
-	UserRole   string `json:"userRole"`   // 使用身份：teacher / parent / personal / org
-	InviteCode string `json:"inviteCode"` // 邀请码（必填，与注册手机号关联校验）
-	// 手机号必填（用于联系与账号找回），格式在下方单独校验以返回友好提示
+	Username string `json:"username" binding:"required,min=2,max=32"`
+	Password string `json:"password" binding:"required,min=6,max=32"`
+	UserRole string `json:"userRole"` // 使用身份：teacher / parent / personal / org
+	// 手机号必填（登录账号），格式在下方单独校验以返回友好提示
 	Phone string `json:"phone"`
-	Email string `json:"email"`
 }
 
 type loginReq struct {
@@ -46,12 +36,11 @@ type loginReq struct {
 
 // updateProfileReq 站点内可自助修改的字段。
 // 用户名：不可为空、2-32 字符、不含空格，需全局唯一；
-// 手机号：支持自助变更（每自然月仅一次），需格式与全局唯一校验，变更后同步关联的邀请码记录；
+// 手机号：支持自助变更（每自然月仅一次），需格式与全局唯一校验；
 // 字段留空表示「不修改」。
 type updateProfileReq struct {
 	Avatar   string `json:"avatar"`
 	Username string `json:"username"`
-	Email    string `json:"email"`
 	Phone    string `json:"phone"`
 }
 
@@ -75,8 +64,15 @@ type memberReq struct {
 	Amount float64 `json:"amount"`                  // 支付金额，用于累计充值统计
 }
 
-// Register 注册：注册成功即赠送 30 天免费会员。
+// Register 注册：手机号自助注册，注册成功即赠送 30 天免费会员。
+// 入口先做同 IP 双窗口限流（见 registerlimit.go），抑制脚本批量刷号。
 func Register(c *gin.Context) {
+	if retry, limited := registerLimitCheck(c.ClientIP(), time.Now()); limited {
+		logger.Info("register rate limited, ip=%s retry_after=%s", c.ClientIP(), retry)
+		Fail(c, CodeTooManyRequest, limitMessage("注册请求", retry))
+		return
+	}
+
 	var req registerReq
 	if err := c.ShouldBindJSON(&req); err != nil {
 		BadRequest(c, "参数有误："+err.Error())
@@ -100,36 +96,6 @@ func Register(c *gin.Context) {
 		return
 	}
 
-	req.Email = strings.TrimSpace(strings.ToLower(req.Email))
-	if req.Email != "" && !emailRegexp.MatchString(req.Email) {
-		BadRequest(c, "邮箱格式不正确")
-		return
-	}
-
-	// 邀请码：必填，与注册手机号关联查询（存在、未使用、且手机号匹配）
-	inviteCode := strings.TrimSpace(req.InviteCode)
-	if inviteCode == "" {
-		BadRequest(c, "请填写邀请码")
-		return
-	}
-	invite, err := model.NewInviteCodeModel().GetByCode(inviteCode)
-	if err != nil {
-		BadRequest(c, "邀请码无效，请核对后重新输入")
-		return
-	}
-	if invite.Invalid == 1 {
-		BadRequest(c, "该邀请码已作废")
-		return
-	}
-	if invite.Used == 1 {
-		BadRequest(c, "该邀请码已被使用")
-		return
-	}
-	if invite.Phone != req.Phone {
-		BadRequest(c, "邀请码与注册手机号不匹配")
-		return
-	}
-
 	// 使用身份：默认老师，非空时需合法（仅影响课程表单与文案，不参与计费）
 	userRole := model.UserRoleTeacher
 	if r := strings.TrimSpace(req.UserRole); r != "" {
@@ -139,7 +105,7 @@ func Register(c *gin.Context) {
 		}
 		userRole = r
 	}
-	// 手机号与邮箱查重
+	// 手机号查重：手机号是唯一的登录账号，不能与他人重复
 	if exists, err := um.ExistsPhone(req.Phone, 0); err != nil {
 		logger.Error("check phone failed, err=%s", err.Error())
 		ServerError(c, "注册失败，请稍后重试")
@@ -147,16 +113,6 @@ func Register(c *gin.Context) {
 	} else if exists {
 		BadRequest(c, "该手机号已被注册")
 		return
-	}
-	if req.Email != "" {
-		if exists, err := um.ExistsEmail(req.Email, 0); err != nil {
-			logger.Error("check email failed, err=%s", err.Error())
-			ServerError(c, "注册失败，请稍后重试")
-			return
-		} else if exists {
-			BadRequest(c, "该邮箱已被注册")
-			return
-		}
 	}
 
 	// 用户名必填（binding 已校验非空与长度）且全局唯一
@@ -180,7 +136,6 @@ func Register(c *gin.Context) {
 		Username:     req.Username,
 		Password:     string(hash),
 		Phone:        strings.TrimSpace(req.Phone),
-		Email:        strings.TrimSpace(req.Email),
 		UserRole:     userRole,
 		TeacherType:  model.TeacherTypeProfessional, // 师资身份已下线，统一按专职标准价计费
 		MemberType:   model.MemberTypeTrial,
@@ -188,34 +143,15 @@ func Register(c *gin.Context) {
 		MemberExpire: now.AddDate(0, 0, trialDays).Unix(),
 		Role:         model.RoleUser,
 		RegisterIP:   c.ClientIP(),
-		RegisterSrc:  model.RegisterSrcInvite,
+		RegisterSrc:  model.RegisterSrcPhone,
 	}
 
-	// 创建用户 + 核销邀请码必须在同一事务内完成：
-	// 任一步失败整体回滚，杜绝「用户已注册但邀请码仍可用」导致的一码多注册。
-	txErr := model.DB().Transaction(func(tx *gorm.DB) error {
-		if err := um.CreateTx(tx, user); err != nil {
-			return err
-		}
-		ok, err := model.NewInviteCodeModel().MarkUsedTx(tx, inviteCode, user.ID)
-		if err != nil {
-			return err
-		}
-		if !ok {
-			return errInviteRace
-		}
-		return nil
-	})
-	if txErr != nil {
-		if errors.Is(txErr, errInviteRace) {
-			BadRequest(c, "该邀请码已被使用")
+	if err := um.Create(user); err != nil {
+		if model.IsDuplicateEntry(err) {
+			BadRequest(c, "手机号或用户名已被注册")
 			return
 		}
-		if model.IsDuplicateEntry(txErr) {
-			BadRequest(c, "用户名已被注册")
-			return
-		}
-		logger.Error("create user failed, err=%s", txErr.Error())
+		logger.Error("create user failed, err=%s", err.Error())
 		ServerError(c, "注册失败，请稍后重试")
 		return
 	}
@@ -243,8 +179,8 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	// 登录仅支持手机号 / 邮箱（管理员同样使用手机号登录，不支持用户名）
-	user, err := model.NewUserModel().GetByPhoneOrEmail(req.Username)
+	// 登录仅支持手机号（管理员同样使用手机号登录，不支持用户名）
+	user, err := model.NewUserModel().GetByPhone(req.Username)
 	if err != nil {
 		respondLoginFail(c, key)
 		return
@@ -326,8 +262,7 @@ func UpdateProfile(c *gin.Context) {
 			user.Username = username
 		}
 	}
-	// 手机号变更：格式校验 + 全局唯一（手机号也是登录账号，不能与他人重复）+ 每自然月仅可修改一次
-	phoneChanged := false
+	// 手机号变更：格式校验 + 全局唯一（手机号是唯一的登录账号，不能与他人重复）+ 每自然月仅可修改一次
 	if req.Phone != "" {
 		phone := strings.TrimSpace(req.Phone)
 		if !phoneRegexp.MatchString(phone) {
@@ -349,34 +284,12 @@ func UpdateProfile(c *gin.Context) {
 			}
 			user.Phone = phone
 			user.PhoneChangedAt = time.Now().Unix()
-			phoneChanged = true
 		}
-	}
-	if req.Email != "" {
-		email := strings.TrimSpace(strings.ToLower(req.Email))
-		if !emailRegexp.MatchString(email) {
-			BadRequest(c, "邮箱格式不正确")
-			return
-		}
-		if exists, err := model.NewUserModel().ExistsEmail(email, user.ID); err != nil {
-			ServerError(c, "保存失败，请稍后重试")
-			return
-		} else if exists {
-			BadRequest(c, "该邮箱已被使用")
-			return
-		}
-		user.Email = email
 	}
 	if err := model.NewUserModel().Save(user); err != nil {
 		logger.Error("save user failed, err=%s", err.Error())
 		ServerError(c, "保存失败，请稍后重试")
 		return
-	}
-	// 手机号变更后同步邀请码关联记录（邀请码与注册手机号强关联，后台按手机号检索）
-	if phoneChanged {
-		if err := model.NewInviteCodeModel().UpdatePhoneByUser(user.ID, user.Phone); err != nil {
-			logger.Error("sync invite code phone failed, err=%s", err.Error())
-		}
 	}
 	OK(c, userVO(user))
 }
@@ -453,29 +366,26 @@ func userVO(u *model.User) gin.H {
 		roleName = model.RoleName[model.RoleUser]
 	}
 	return gin.H{
-		"id":                  u.ID,
-		"username":            u.Username,
-		"avatar":              u.Avatar,
-		"phone":               u.Phone,
-		"phoneChangedAt":      u.PhoneChangedAt,
-		"email":               u.Email,
-		"role":                u.Role,
-		"roleName":            roleName,
-		"isStaff":             u.IsStaff(),
-		"status":              u.Status,
-		"statusName":          model.UserStatusName[u.Status],
-		"memberType":          u.MemberType,
-		"memberTypeName":      typeName,
-		"totalPaid":          u.TotalPaid, // 累计充值金额
-		"memberStart":         u.MemberStart,   // 秒级时间戳
-		"memberExpire":        u.MemberExpire,  // 秒级时间戳
-		"memberActive":        u.MemberActive(),
-		"memberLeftDays":      u.MemberLeftDays(),
-		"registeredAt":        u.CreatedAt, // 秒级时间戳
-		"registeredDays":      u.RegisteredDays(),
-		"userRole":            u.UserRole,
-		"userRoleName":        model.UserRoleName[u.UserRole],
+		"id":             u.ID,
+		"username":       u.Username,
+		"avatar":         u.Avatar,
+		"phone":          u.Phone,
+		"phoneChangedAt": u.PhoneChangedAt,
+		"role":           u.Role,
+		"roleName":       roleName,
+		"isStaff":        u.IsStaff(),
+		"status":         u.Status,
+		"statusName":     model.UserStatusName[u.Status],
+		"memberType":     u.MemberType,
+		"memberTypeName": typeName,
+		"totalPaid":      u.TotalPaid,    // 累计充值金额
+		"memberStart":    u.MemberStart,  // 秒级时间戳
+		"memberExpire":   u.MemberExpire, // 秒级时间戳
+		"memberActive":   u.MemberActive(),
+		"memberLeftDays": u.MemberLeftDays(),
+		"registeredAt":   u.CreatedAt, // 秒级时间戳
+		"registeredDays": u.RegisteredDays(),
+		"userRole":       u.UserRole,
+		"userRoleName":   model.UserRoleName[u.UserRole],
 	}
 }
-
-

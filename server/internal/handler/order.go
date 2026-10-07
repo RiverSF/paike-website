@@ -45,23 +45,16 @@ type orderReq struct {
 	Status           string             `json:"status"`
 }
 
-// generateOrderNo 自动生成订单编号：邀请码-YYYYMMDD-4位随机数。
-// 邀请码取自当前用户注册时使用的邀请码；管理员 / 站长无邀请码时按角色回退前缀（ADMIN/OWNER），
-// 其余回退 ORD。通过 ExistsOrderNo 去重，最多重试 8 次。
+// generateOrderNo 自动生成订单编号：前缀-YYYYMMDD-4位随机数。
+// 前缀按角色取值：站长=OWNER、管理员=ADMIN、普通用户=ORD。通过 ExistsOrderNo 去重，最多重试 8 次。
 func generateOrderNo(userID uint) string {
-	prefix := strings.TrimSpace(model.NewInviteCodeModel().CodeOfUser(userID))
-	if prefix == "" {
-		if u, err := model.NewUserModel().GetByID(userID); err == nil {
-			switch u.Role {
-			case "owner":
-				prefix = "OWNER"
-			case "admin":
-				prefix = "ADMIN"
-			default:
-				prefix = "ORD"
-			}
-		} else {
-			prefix = "ORD"
+	prefix := "ORD"
+	if u, err := model.NewUserModel().GetByID(userID); err == nil {
+		switch u.Role {
+		case "owner":
+			prefix = "OWNER"
+		case "admin":
+			prefix = "ADMIN"
 		}
 	}
 	date := time.Now().Format("20060102")
@@ -225,7 +218,7 @@ func OrderCreate(c *gin.Context) {
 		req.Direction = model.DefaultDirection(user.UserRole)
 	}
 
-	// 订单编号未填写时自动生成：邀请码-YYYYMMDD-4位随机数
+	// 订单编号未填写时自动生成：前缀-YYYYMMDD-4位随机数
 	if strings.TrimSpace(req.OrderNo) == "" {
 		req.OrderNo = generateOrderNo(user.ID)
 	}

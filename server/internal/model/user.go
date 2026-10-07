@@ -93,10 +93,10 @@ func (u *User) IsStaff() bool {
 	return u.Role == RoleAdmin || u.Role == RoleOwner
 }
 
-// 注册来源（user.register_src），用于区分准入强度与统计归因：
-// invite=邀请码注册（现行） wechat=微信授权注册 admin=管理员人工开通
+// 注册来源（user.register_src），用于区分注册方式并做统计归因：
+// phone=手机号自助注册 wechat=微信授权注册 admin=管理员人工开通
 const (
-	RegisterSrcInvite = "invite"
+	RegisterSrcPhone  = "phone"
 	RegisterSrcWechat = "wechat"
 	RegisterSrcAdmin  = "admin"
 )
@@ -151,8 +151,7 @@ type User struct {
 	Username string `gorm:"size:64;uniqueIndex;not null" json:"username"` // 用户名，唯一
 	Password string `gorm:"size:128;not null" json:"-"`                   // 登录密码，bcrypt 加密
 	Avatar   string `gorm:"size:255;not null" json:"avatar"`
-	Phone    string `gorm:"size:32;not null" json:"phone"`
-	Email    string `gorm:"size:128;not null" json:"email"`
+	Phone    string `gorm:"size:32;not null" json:"phone"` // 手机号，唯一的登录账号
 
 	// ---- B. 角色与状态 ----
 	Role   string `gorm:"size:16;not null;default:user" json:"role"`     // 角色：owner=站长 admin=管理员 user=普通用户
@@ -178,12 +177,11 @@ type User struct {
 
 	PhoneChangedAt int64 `gorm:"not null;default:0" json:"phoneChangedAt"` // 最近修改手机号的时间（Unix 秒）
 
-	// ---- E. 注册归因与风控（新增列必须带 default，否则存量库 AutoMigrate 会报 contains null values）----
-	InvitedByID uint   `gorm:"not null;default:0" json:"invitedByUserId"`          // 推荐人用户 ID，0=无推荐人
-	RegisterIP  string `gorm:"size:64;not null;default:''" json:"-"`               // 注册 IP
-	RegisterSrc string `gorm:"size:16;not null;default:invite" json:"registerSrc"` // 注册来源：invite / wechat / admin
-	CreatedAt   int64  `gorm:"autoCreateTime;not null" json:"createdAt"`           // 注册时间（Unix 秒）
-	UpdatedAt   int64  `gorm:"autoUpdateTime;not null" json:"updatedAt"`           // 更新时间（Unix 秒）
+	// ---- E. 注册风控（新增列必须带 default，否则存量库 AutoMigrate 会报 contains null values）----
+	RegisterIP  string `gorm:"size:64;not null;default:''" json:"-"`              // 注册 IP
+	RegisterSrc string `gorm:"size:16;not null;default:phone" json:"registerSrc"` // 注册来源：phone / wechat / admin
+	CreatedAt   int64  `gorm:"autoCreateTime;not null" json:"createdAt"`          // 注册时间（Unix 秒）
+	UpdatedAt   int64  `gorm:"autoUpdateTime;not null" json:"updatedAt"`          // 更新时间（Unix 秒）
 }
 
 func (m User) TableName() string { return "user" }
@@ -293,32 +291,14 @@ func (m *UserModel) GetByUsername(username string) (*User, error) {
 	return &u, nil
 }
 
-// GetByPhoneOrEmail 登录仅支持手机号 / 邮箱。
-func (m *UserModel) GetByPhoneOrEmail(account string) (*User, error) {
+// GetByPhone 登录仅支持手机号（管理员同样使用手机号登录，不支持用户名）。
+func (m *UserModel) GetByPhone(account string) (*User, error) {
 	account = strings.TrimSpace(account)
 	if account == "" {
 		return nil, ErrUserNotFound
 	}
 	var u User
-	err := db.Where("phone = ? OR email = ?", account, account).
-		Order("id ASC").First(&u).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrUserNotFound
-		}
-		return nil, err
-	}
-	return &u, nil
-}
-
-// GetByAccount 支持用用户名 / 手机号 / 邮箱登录。
-func (m *UserModel) GetByAccount(account string) (*User, error) {
-	account = strings.TrimSpace(account)
-	if account == "" {
-		return nil, ErrUserNotFound
-	}
-	var u User
-	err := db.Where("username = ? OR phone = ? OR email = ?", account, account, account).
+	err := db.Where("phone = ?", account).
 		Order("id ASC").First(&u).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -361,28 +341,11 @@ func (m *UserModel) ExistsUsername(username string, excludeID uint) (bool, error
 	return count > 0, nil
 }
 
-// ExistsEmail 邮箱是否已存在（excludeID>0 时排除该用户）。
-func (m *UserModel) ExistsEmail(email string, excludeID uint) (bool, error) {
-	if email == "" {
-		return false, nil
-	}
-	var count int64
-	tx := db.Model(&User{}).Where("email = ?", email)
-	if excludeID > 0 {
-		tx = tx.Where("id <> ?", excludeID)
-	}
-	if err := tx.Count(&count).Error; err != nil {
-		return false, err
-	}
-	return count > 0, nil
-}
-
 type AdminUserQuery struct {
 	Keyword       string
 	Role          string
 	Status        string
 	MemberType    string
-	InviteCode    string
 	OnlyActive    bool
 	Page          int
 	PageSize      int
@@ -415,13 +378,8 @@ func (m *UserModel) AdminList(q AdminUserQuery) ([]User, int64, error) {
 	if q.Keyword != "" {
 		like := "%" + q.Keyword + "%"
 		// 关键词同时匹配用户 ID（纯数字直接搜 ID 的场景）
-		tx = tx.Where("username ILIKE ? OR phone ILIKE ? OR email ILIKE ? OR CAST(id AS TEXT) ILIKE ?",
-			like, like, like, like)
-	}
-	// 邀请码筛选：匹配该用户注册时使用的邀请码
-	if code := strings.TrimSpace(q.InviteCode); code != "" {
-		like := "%" + code + "%"
-		tx = tx.Where("id IN (SELECT used_by_id FROM invite_code WHERE code ILIKE ?)", like)
+		tx = tx.Where("username ILIKE ? OR phone ILIKE ? OR CAST(id AS TEXT) ILIKE ?",
+			like, like, like)
 	}
 
 	var total int64
@@ -586,7 +544,7 @@ func (m *UserModel) HasTeachingData(id uint) (bool, error) {
 	return cnt > 0, nil
 }
 
-// DeleteAccount 删除账号及其附属数据（站内信、反馈、学生申请、上课提醒、其核销的邀请码）。
+// DeleteAccount 删除账号及其附属数据（站内信、反馈、学生申请、上课提醒）。
 // 课程订单、课次与充值流水不删除：调用方需先用 HasTeachingData 确认账号没有这类数据。
 func (m *UserModel) DeleteAccount(id uint) error {
 	// table + WHERE 条件均来自下方固定清单，不含外部输入
@@ -599,7 +557,6 @@ func (m *UserModel) DeleteAccount(id uint) error {
 		{table: "feedback", where: "user_id = ?", args: []interface{}{id}},
 		{table: "student_application", where: "user_id = ?", args: []interface{}{id}},
 		{table: "lesson_reminder", where: "user_id = ?", args: []interface{}{id}},
-		{table: "invite_code", where: "used_by_id = ?", args: []interface{}{id}},
 	}
 	return db.Transaction(func(tx *gorm.DB) error {
 		for _, s := range stmts {

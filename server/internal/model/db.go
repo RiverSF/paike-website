@@ -81,7 +81,7 @@ func AutoMigrate() error {
 	if err := EnsureNotNull(); err != nil {
 		return err
 	}
-	if err := db.AutoMigrate(&User{}, &Order{}, &Feedback{}, &Payment{}, &PriceConfig{}, &PriceSchedule{}, &PriceHistory{}, &InviteCode{}, &Message{}, &StudentApplication{}, &LessonException{}, &Lesson{}, &LessonReminder{}, &TrialNudge{}); err != nil {
+	if err := db.AutoMigrate(&User{}, &Order{}, &Feedback{}, &Payment{}, &PriceConfig{}, &PriceSchedule{}, &PriceHistory{}, &Message{}, &StudentApplication{}, &LessonException{}, &Lesson{}, &LessonReminder{}, &TrialNudge{}); err != nil {
 		return err
 	}
 	// 索引统一在 EnsureIndexes 维护（建需要的、清冗余的），需在 AutoMigrate 之后执行

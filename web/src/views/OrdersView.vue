@@ -499,6 +499,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { ChatDotSquare, Operation, Plus, QuestionFilled } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 import dayjs from 'dayjs'
+import { useRoute, useRouter } from 'vue-router'
 import WeeklySlotEditor from '@/components/WeeklySlotEditor.vue'
 import ReorderList from '@/components/ReorderList.vue'
 import { orderApi } from '@/api'
@@ -508,6 +509,8 @@ import { useTrialStore, TRIAL_COURSE_LIMIT } from '@/stores/trial'
 import { sanitizeText, validateTexts } from '@/utils/text'
 
 const userStore = useUserStore()
+const route = useRoute()
+const router = useRouter()
 
 // 订单状态：进行中（列表置顶并高亮） / 已结束
 const statusMap = {
@@ -917,12 +920,11 @@ function validatePhone(val) {
   phoneError.value = /^1[3-9]\d{9}$/.test(v) ? '' : '请输入正确的 11 位手机号'
 }
 
-// 订单编号前缀：有邀请码用邀请码；站长 / 管理员无邀请码时按角色回退，保证可读
+// 订单编号前缀：按角色回退，保证可读
 function orderNoPrefix() {
   // 免注册试用：本地编号统一 TRIAL 前缀
   if (trialStore.isGuest) return 'TRIAL'
   const p = userStore.profile
-  if (p?.inviteCode) return p.inviteCode.trim()
   if (p?.role === 'owner') return 'OWNER'
   if (p?.isStaff) return 'ADMIN'
   return 'ORD'
@@ -1195,7 +1197,7 @@ async function submit() {
     form.value.publisher = ''
     form.value.publishedAt = ''
   }
-  // 订单编号为空时按「邀请码-年月日-4位随机数」自动生成（管理员/站长按角色回退前缀）
+  // 订单编号为空时按「前缀-年月日-4位随机数」自动生成（管理员/站长按角色回退前缀）
   if (!form.value.orderNo || !form.value.orderNo.trim()) {
     const code = orderNoPrefix()
     const date = dayjs().format('YYYYMMDD')
@@ -1502,8 +1504,23 @@ watch(dashDim, () => {
   if (dashChart) nextTick(renderDashChart)
 })
 
+// 外部入口（首页「去录入课程」等）带 ?new=1 进入时，直接打开「添加课程」抽屉，
+// 避免用户落到列表页后还要自己再找按钮（按钮文案与落点保持一致）
+function openCreateFromQuery() {
+  if (route.query.new !== '1') return
+  // 清掉参数：刷新页面不重复弹出，也不干扰后续手动操作
+  router.replace({ path: '/orders' })
+  if (readonlyMode.value) {
+    ElMessage.warning('会员已过期，续费后才能新增课程')
+    window.dispatchEvent(new CustomEvent('open-profile'))
+    return
+  }
+  openCreate()
+}
+
 onMounted(() => {
   window.addEventListener('resize', onResize)
+  openCreateFromQuery()
 })
 
 onBeforeUnmount(() => {

@@ -96,7 +96,7 @@
           <div class="filters">
             <el-input
               v-model="filters.keyword"
-              placeholder="搜索 ID / 用户名 / 手机号 / 邮箱"
+              placeholder="搜索 ID / 用户名 / 手机号"
               clearable
               style="width: 240px"
               @keyup.enter="searchUsers"
@@ -125,10 +125,9 @@
           <el-table v-loading="loading" :data="list" border stripe>
             <el-table-column prop="id" label="账号 ID" width="70" />
             <el-table-column prop="username" label="用户名" width="120" show-overflow-tooltip />
-            <el-table-column label="登录账号（手机 / 邮箱）" min-width="200" show-overflow-tooltip>
+            <el-table-column label="登录手机号" min-width="180" show-overflow-tooltip>
               <template #default="{ row }">
                 <div>{{ row.phone || '-' }}</div>
-                <div class="cell-sub">{{ row.email || '-' }}</div>
               </template>
             </el-table-column>
             <el-table-column label="角色" width="100">
@@ -458,11 +457,6 @@
             </div>
           </template>
 
-          <!-- 邀请码 -->
-          <template v-else-if="t.name === 'invite'">
-            <InviteCodePanel />
-          </template>
-
           <!-- 用户反馈 -->
           <template v-else-if="t.name === 'feedback'">
             <FeedbackPanel />
@@ -577,7 +571,7 @@
     <!-- 添加管理员（仅站长）：只需填写登录信息 -->
     <el-dialog v-model="adminVisible" title="添加管理员" width="420px" @keyup.enter="submitCreateAdmin">
       <div class="muted small" style="margin-bottom:12px">
-        填写登录信息即可：创建后该账号即为管理员，享有永久会员权益，无需邀请码；请妥善保存密码，管理员登录后可在个人信息中自行修改。
+        填写登录信息即可：创建后该账号即为管理员，享有永久会员权益；请妥善保存密码，管理员登录后可在个人信息中自行修改。
       </div>
       <el-form label-position="top" @submit.prevent>
         <el-form-item label="用户名">
@@ -620,7 +614,7 @@
           <el-tag size="small" effect="light" round>{{ pwdUser.roleName }}</el-tag>
         </div>
         <div class="ru-meta">
-          {{ pwdUser.phone || pwdUser.email || '-' }} · {{ pwdUser.identityName }}
+          {{ pwdUser.phone || '-' }} · {{ pwdUser.identityName }}
         </div>
       </div>
       <el-form label-position="top" class="renew-form" @submit.prevent>
@@ -668,7 +662,6 @@ import { useUserStore } from '@/stores/user'
 import FeedbackPanel from '@/components/FeedbackPanel.vue'
 import { isValidPhone, sanitizeText, validateText, validateTexts } from '@/utils/text'
 import { zhe, priceCardTags } from '@/utils/priceTags'
-import InviteCodePanel from '@/components/InviteCodePanel.vue'
 import ReorderList from '@/components/ReorderList.vue'
 import PriceEff from '@/components/PriceEff.vue'
 
@@ -682,7 +675,6 @@ const TAB_META = [
   { name: 'overview', label: '会员总览', weight: 10 },
   { name: 'users', label: '用户列表', weight: 30 },
   { name: 'price', label: '价格设置', weight: 40 },
-  { name: 'invite', label: '邀请码', weight: 50, lazy: true },
   { name: 'feedback', label: '用户反馈', weight: 60, lazy: true },
   { name: 'messages', label: '站内信', weight: 70 }
 ]

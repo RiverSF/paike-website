@@ -56,7 +56,7 @@
 ---
 
 ### 8. 站点拥有者（owner）冷启动初始化（严重）
-- **风险**：原系统无任何 owner 时，因邀请码需管理员发放、管理员需 owner 创建，形成"无 owner 则无管理员"的冷启动死锁；且 `model/user.go:35` 注释暗示"ID=1 即 owner"，存在首注册者误成超级管理员的隐患。
+- **风险**：原系统无任何 owner 初始化流程，管理员只能由 owner 创建，形成"无 owner 则无管理员"的冷启动死锁；且 `model/user.go:35` 注释暗示"ID=1 即 owner"，存在首注册者误成超级管理员的隐患。
 - **修复**：新增 `server/internal/model/seed.go` 的 `SeedOwner()`，在 `main.go` 启动 DB 后调用。逻辑：
   - 已有 owner 则跳过（幂等）；
   - 否则读取 `INIT_OWNER_USERNAME` / `INIT_OWNER_PHONE` / `INIT_OWNER_PASSWORD` 三件套，**仅当齐全且格式合法**（用户名 2-32 位、11 位手机号、密码 ≥8 位、用户名/手机号不重复）时才自动创建首个 owner（永久会员）；
@@ -67,6 +67,16 @@
 ### 9. K8s Ingress TLS（严重）
 - **修复**：`deploy/k8s/06-ingress.yaml` 增加 `spec.tls` 引用 `tutoring-tls` Secret，并加注解 `ssl-redirect: "true"` 强制 HTTPS。
 - **仍需**：创建证书 Secret（`kubectl create secret tls tutoring-tls --cert=xxx.crt --key=xxx.key`，或 cert-manager 自动签发）；将 host 由 `tutoring.local` 改为真实域名。**Web Pod 内部 nginx 不终止 TLS**（TLS 在 ingress 层终止），无需改动 `nginx.conf`。
+
+### 10. 注册接口防刷（下线邀请码后的主要风险点）（高）
+- **风险**：2026-10-08 取消邀请码后，注册只需用户名 + 密码 + 手机号即可完成并立即获得 30 天会员，脚本可批量刷号；且 Gin 默认信任所有代理，伪造 `X-Forwarded-For` 可绕过任何按 IP 的限流。
+- **修复**：
+  - 新增 `server/internal/handler/registerlimit.go`：同一 IP **10 分钟 3 次 / 24 小时 10 次**双窗口限流，超限返回业务码 `429`；按请求次数计数（失败请求同样计入），命中时不回显剩余次数，避免被用于探测阈值。
+  - 新增 `server/internal/handler/ratelimit.go`：注册 / 登录共用的窗口算法与内存保护（IP 记录上限 20000，超出整体清理）。
+  - 登录侧补 **IP 维度**（`loginlimit.go`）：15 分钟内失败 30 次即限流，挡「同一来源用大量账号各试几次」的横向撞库；账号维度仍为连续失败 5 次锁 30 分钟。
+  - `server/internal/router/router.go` 调用 `SetTrustedProxies(config.ServerConfig.TrustedProxies)`：新增 `TRUSTED_PROXIES` 配置（`[server]` 段 / 环境变量），**未配置时不信任任何代理**，客户端 IP 取 TCP 连接地址，堵住伪造 IP 绕过限流。
+  - `handler/upload.go` 的匿名上传频控补内存清理，硬编码 `429` 改用 `CodeTooManyRequest`。
+- **验证**：同一 IP 连续提交注册，第 4 次返回 `429 注册请求过于频繁…`；伪造 `X-Forwarded-For` 不影响计数；配置 `TRUSTED_PROXIES`（nginx / ingress 场景）后按真实客户端 IP 计数。
 
 ---
 
@@ -83,7 +93,7 @@
 | 7 | **敏感证件合规** | 建议 | 用户上传的身份证/学生证属 PII，建议加密/权限隔离存储、仅审核员可见、遵守最小必要原则。|
 | 8 | **备份与数据持久化** | 建议 | PostgreSQL 数据（充值/会员）重要，建立定期备份；生产建议云托管 + 自动备份。|
 | 9 | **依赖与供应链审计** | 建议 | 上线前执行 `go mod tidy` + `npm audit`，确认无已知高危漏洞。|
-| 10 | **登录/注册限流增强** | 建议 | `loginlimit.go` 为进程内、仅账号维度；建议改为 Redis 共享 + 增加 IP 维度；注册接口加验证码/邀请码速率限制。|
+| 10 | **限流改为共享存储** | 建议 | 注册（IP 双窗口）、登录（账号锁定 + 上文已加的 IP 维度）、上传频控均为**进程内计数**，单实例有效；多副本部署须改为 Redis 等共享存储，否则实际额度随副本数放大。|
 
 ---
 
@@ -94,6 +104,8 @@
 - [ ] release 模式下设置 `JWT_SECRET=$(openssl rand -hex 32)` 可正常启动
 - [ ] 未配置 `CORS_ALLOW_ORIGINS` 时跨域请求被拦截；配置白名单后正常
 - [ ] `/api/upload` 拒绝 `.svg` 与非图片文件；高频上传返回 429
+- [ ] 同一 IP 连续发起注册，第 4 次返回 `429 注册请求过于频繁…`；伪造 `X-Forwarded-For` 不影响计数
+- [ ] `TRUSTED_PROXIES` 已按部署形态配置（nginx / ingress 场景填代理网段；直连场景留空）
 - [ ] 响应头包含 `X-Content-Type-Options` / `X-Frame-Options` / `Content-Security-Policy`
 - [ ] `/api/feedback` 未登录响应不含用户名/联系方式
 - [ ] 全站 HTTPS 已启用，HTTP 跳转 HTTPS

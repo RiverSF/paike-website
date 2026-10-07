@@ -10,10 +10,11 @@
     </el-tabs>
 
     <el-form v-if="active === 'login'" :model="loginForm" label-position="top" @submit.prevent>
-      <el-form-item label="手机号 / 邮箱">
+      <el-form-item label="手机号">
         <el-input
           v-model="loginForm.username"
-          placeholder="请输入手机号或邮箱"
+          maxlength="11"
+          placeholder="请输入注册手机号"
           autocomplete="username"
         />
       </el-form-item>
@@ -40,16 +41,9 @@
         <el-input
           v-model="regForm.phone"
           maxlength="11"
-          placeholder="请输入 11 位手机号（必填）"
+          placeholder="请输入 11 位手机号"
           @keyup.enter="submit"
         />
-      </el-form-item>
-      <el-form-item label="邀请码" required>
-        <el-input v-model="regForm.inviteCode" maxlength="16" placeholder="请填写邀请码（必填）" />
-      </el-form-item>
-      <div class="tip invite-tip">还没有邀请码？请扫描首页下方<b>添加微信好友</b>二维码进行申请，一个微信账号仅可申请一个邀请码。</div>
-      <el-form-item label="邮箱（选填）">
-        <el-input v-model="regForm.email" placeholder="便于找回账号，可稍后补充" />
       </el-form-item>
       <el-form-item label="你是谁">
         <el-radio-group v-model="regForm.userRole">
@@ -57,7 +51,6 @@
           <el-radio value="parent">学员</el-radio>
           <el-radio value="org">机构</el-radio>
         </el-radio-group>
-        <div class="tip role-tip">{{ roleTip }}</div>
       </el-form-item>
       <div v-if="props.tip && active === 'register'" class="tip guide-tip">{{ props.tip }}</div>
       <div class="tip">注册即赠送 <b>30 天</b>免费会员，可直接使用课程与课表功能。</div>
@@ -103,22 +96,12 @@ watch(visible, (open) => {
 })
 const loading = ref(false)
 const loginForm = reactive({ username: '', password: '' })
-const regForm = reactive({ username: '', password: '', phone: '', email: '', inviteCode: '', userRole: 'teacher' })
-
-// 使用身份说明：只影响课程表单与文案，不参与计费（统一按专职标准价计费）
-const roleTip = computed(
-  () =>
-    ({
-      teacher: '接单上课、管理学员课程。',
-      parent: '安排孩子或自己的课程，一周不冲突。',
-      org: '多学员、多科目统一排课，一个账号管全部课表。'
-    })[regForm.userRole] || ''
-)
+const regForm = reactive({ username: '', password: '', phone: '', userRole: 'teacher' })
 
 async function submit() {
   if (active.value === 'login') {
     if (!loginForm.username || !loginForm.password) {
-      ElMessage.warning('请输入手机号/邮箱和密码')
+      ElMessage.warning('请输入手机号和密码')
       return
     }
     loading.value = true
@@ -158,19 +141,12 @@ async function submit() {
     ElMessage.warning('请填写正确的 11 位手机号')
     return
   }
-  const inviteCode = regForm.inviteCode.trim()
-  if (!inviteCode) {
-    ElMessage.warning('请填写邀请码')
-    return
-  }
   loading.value = true
   try {
     await userStore.register({
       username: sanitizeText(regForm.username),
       password: regForm.password,
       phone,
-      email: regForm.email,
-      inviteCode,
       userRole: regForm.userRole
     })
     ElMessage.success('注册成功，已赠送 30 天会员')
@@ -198,15 +174,6 @@ async function submit() {
 
 .tip b {
   color: var(--el-color-primary);
-}
-
-.invite-tip {
-  margin-bottom: 14px;
-}
-
-.role-tip {
-  margin-top: 6px;
-  line-height: 1.5;
 }
 
 /* 试用数据未保存等注册引导提示 */

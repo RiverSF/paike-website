@@ -52,12 +52,6 @@
               <span v-if="phoneLocked" class="muted small">（本月已修改过，下月可再次修改）</span>
             </template>
           </el-descriptions-item>
-          <el-descriptions-item label="邮箱">
-            <template v-if="editing">
-              <el-input v-model="form.email" size="small" placeholder="请输入邮箱" />
-            </template>
-            <template v-else>{{ profile.email || '未填写' }}</template>
-          </el-descriptions-item>
           <el-descriptions-item label="登录密码">
             <div class="pwd-row">
               <span class="pwd-mask">********</span>
@@ -206,7 +200,6 @@ import dayjs from 'dayjs'
 import { userApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { usePriceStore } from '@/stores/price'
-import { sanitizeText } from '@/utils/text'
 import { userRoleLabel } from '@/utils/identity'
 import { topDiscountTag } from '@/utils/priceTags'
 
@@ -334,8 +327,8 @@ const memberExpiringSoon = computed(() => {
 const editing = ref(false)
 const saving = ref(false)
 const renewing = ref(false)
-// 可自助修改：用户名 + 手机号（每自然月一次） + 邮箱
-const form = ref({ username: '', phone: '', email: '' })
+// 可自助修改：用户名 + 手机号（每自然月一次）
+const form = ref({ username: '', phone: '' })
 
 // 手机号本月是否已修改过（同一自然月内不可再次修改）
 const phoneLocked = computed(() => {
@@ -426,8 +419,7 @@ watch(visible, (v) => {
 function startEdit() {
   form.value = {
     username: profile.value.username || '',
-    phone: profile.value.phone || '',
-    email: profile.value.email || ''
+    phone: profile.value.phone || ''
   }
   editing.value = true
 }
@@ -458,7 +450,7 @@ async function save() {
   }
   saving.value = true
   try {
-    await userStore.updateProfile({ username, phone, email: sanitizeText(form.value.email) })
+    await userStore.updateProfile({ username, phone })
     ElMessage.success('资料已更新')
     editing.value = false
   } finally {

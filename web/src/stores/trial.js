@@ -34,8 +34,10 @@ function incomeOf(order, durationMin) {
 }
 
 function slotMinutes(slot) {
-  const [sh, sm] = String(slot.startTime || '00:00').split(':').map(Number)
-  const [eh, em] = String(slot.endTime || '00:00').split(':').map(Number)
+  // 表单里周时段的结构是 { days: [1..7], start: 'HH:mm', end: 'HH:mm' }，与后端接口的
+  // startTime/endTime 命名不同，这里统一按表单结构取值
+  const [sh, sm] = String(slot.start || slot.startTime || '00:00').split(':').map(Number)
+  const [eh, em] = String(slot.end || slot.endTime || '00:00').split(':').map(Number)
   const start = (sh || 0) * 60 + (sm || 0)
   const end = (eh || 0) * 60 + (em || 0)
   return { start, end, duration: Math.max(0, end - start) }
@@ -143,7 +145,7 @@ export const useTrialStore = defineStore('trial', {
         const end = order.endDate && dayjs(order.endDate).isBefore(today) ? dayjs(order.endDate) : dayjs(today)
         while (cursor.isBefore(end) || cursor.isSame(end, 'day')) {
           const wd = cursor.day() === 0 ? 7 : cursor.day()
-          if (order.weeklySlots.some((s) => Number(s.day) === wd)) done++
+          if (order.weeklySlots.some((s) => (s.days || []).includes(wd))) done++
           cursor = cursor.add(1, 'day')
         }
       }
@@ -183,28 +185,32 @@ export const useTrialStore = defineStore('trial', {
       for (const order of this.orders) {
         if (order.status === 'voided') continue
         for (const slot of order.weeklySlots || []) {
+          const slotDays = (slot.days || []).map(Number)
           for (const day of days) {
-            if (Number(slot.day) !== day.weekday) continue
+            if (!slotDays.includes(day.weekday)) continue
             if (day.date < order.startDate) continue
             if (order.endDate && day.date > order.endDate) continue
+            // 生效区间（含首尾），落在区间外的不生成课次
+            if (slot.effectiveFrom && day.date < slot.effectiveFrom) continue
+            if (slot.effectiveTo && day.date > slot.effectiveTo) continue
             const { start: startMinute, end: endMinute, duration } = slotMinutes(slot)
+            const startTime = slot.start || slot.startTime || ''
+            const endTime = slot.end || slot.endTime || ''
             const income = incomeOf(order, duration)
             let timeState = 'future'
             if (day.date < today) timeState = 'past'
             else if (day.date === today) {
-              const endTime = String(slot.endTime || '')
-              const startTime = String(slot.startTime || '')
               if (endTime && endTime < nowStr) timeState = 'past'
               else if (startTime <= nowStr && (!endTime || endTime >= nowStr)) timeState = 'ongoing'
             }
             events.push({
-              key: `${order.id}-${day.date}-${slot.startTime}`,
+              key: `${order.id}-${day.date}-${startTime}`,
               orderId: order.id,
               orderNo: order.orderNo,
               date: day.date,
               weekday: day.weekday,
-              startTime: slot.startTime,
-              endTime: slot.endTime,
+              startTime,
+              endTime,
               startMinute,
               endMinute,
               grade: order.grade,

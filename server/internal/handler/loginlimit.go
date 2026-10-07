@@ -69,3 +69,45 @@ func loginClear(key string) {
 	defer loginLimiter.Unlock()
 	delete(loginLimiter.attempts, key)
 }
+
+// ---- 登录 IP 维度限流 ----
+//
+// 账号维度（上方）挡的是「盯住一个账号反复试密码」；IP 维度挡的是「同一来源用大量账号各试几次」的
+// 横向撞库（这种打法每个账号都不触发账号锁定）。
+// 额度刻意放宽（远大于账号维度的 5 次），避免公司 / 学校等共享出口的正常用户被误伤。
+const (
+	loginIPWindow   = 15 * time.Minute
+	loginIPMaxFails = 30
+	loginIPMaxKeys  = 20000
+)
+
+// loginIPLimiter 进程内 IP 登录失败记录（每个 IP 一份按时间升序的失败时间戳）。
+var loginIPLimiter = struct {
+	sync.Mutex
+	fails map[string][]time.Time
+}{fails: make(map[string][]time.Time)}
+
+// loginIPBlocked 查询该 IP 是否已被限流；blocked=true 时 retry 为建议等待时长。
+func loginIPBlocked(ip string, now time.Time) (retry time.Duration, blocked bool) {
+	if ip == "" {
+		return 0, false
+	}
+	loginIPLimiter.Lock()
+	defer loginIPLimiter.Unlock()
+	loginIPLimiter.fails[ip] = pruneHits(loginIPLimiter.fails[ip], now.Add(-loginIPWindow))
+	return windowExceeded(loginIPLimiter.fails[ip], now, loginIPWindow, loginIPMaxFails)
+}
+
+// loginIPRecordFail 记录一次登录失败（密码错误 / 账号不存在）。
+// 登录成功不清零该计数：否则攻击者可用自己的账号「重置」IP 计数，限流形同虚设。
+func loginIPRecordFail(ip string, now time.Time) {
+	if ip == "" {
+		return
+	}
+	loginIPLimiter.Lock()
+	defer loginIPLimiter.Unlock()
+	loginIPLimiter.fails[ip] = append(pruneHits(loginIPLimiter.fails[ip], now.Add(-loginIPWindow)), now)
+	if len(loginIPLimiter.fails) > loginIPMaxKeys {
+		loginIPLimiter.fails = pruneLimiter(loginIPLimiter.fails, now.Add(-loginIPWindow))
+	}
+}
