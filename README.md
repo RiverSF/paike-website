@@ -16,9 +16,9 @@
 
 ## 功能演示
 
-<video src="https://github.com/RiverSF/paike-website/raw/main/web/public/videos/guide-demo.mp4" poster="web/public/videos/guide-demo-cover.png" controls width="100%" preload="metadata">您的浏览器不支持内联播放，<a href="https://github.com/RiverSF/paike-website/raw/main/web/public/videos/guide-demo.mp4">点击此处下载观看</a>。</video>
+![功能演示](web/public/videos/guide-demo.gif)
 
-> 演示视频约 50 秒，与前端「使用指南 / 首页」同款；源文件 `web/public/videos/guide-demo.mp4`。在支持 HTML 的预览（本地 IDE、浏览器）中可直接内联播放，无需下载；GitHub 网页不渲染 `<video>` 标签时，点击上方链接下载观看。
+> 演示视频约 60 秒，与前端「使用指南 / 首页」同款；上方为静音 GIF 预览，GitHub 网页与本地 IDE 均会内联渲染。完整带声版本见 `web/public/videos/guide-demo.mp4`（[在线观看](https://github.com/RiverSF/paike-website/raw/main/web/public/videos/guide-demo.mp4)）。
 
 ## 快速开始（开发模式）
 
